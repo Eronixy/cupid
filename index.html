@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cupid</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        #game-container {
+            width: 100%;
+            display: flex;
+            justify-content: left;
+            align-items: center;
+        }
+
+        footer {
+            background-color: #333;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            main {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <p>Cupid's Day</p>
+    </header>
+    <main>
+        <div id="game-container"></div>
+    </main>
+    <footer>
+        <p>Created by Irron</p>
+    </footer>
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game-container',
+            width: 1200,
+            height: 800,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: {
+                        y: 0
+                    },
+                    debug: false
+                }
+            },
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            },
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            input: {
+                activePointers: 2
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        let cat;
+        let currentMission = 0;
+        let bgMusic;
+        let isInteracting = false;
+        let welcomeText;
+        let touchButton;
+        const missions = [{
+                text: 'Eat your food!',
+                completed: false,
+                sprite: 'cat-eating',
+                sound: 'eating-sound'
+            },
+            {
+                text: 'Fight the vacuum!',
+                completed: false,
+                sprite: 'cat-fighting',
+                sound: 'fighting-sound'
+            },
+            {
+                text: 'Dance!',
+                completed: false,
+                sprite: 'cat-dancing',
+                sound: 'dancing-sound'
+            },
+            {
+                text: 'Scratch the cardboard!',
+                completed: false,
+                sprite: 'cat-scratching',
+                sound: 'scratching-sound'
+            },
+            {
+                text: 'Catch the mouse!',
+                completed: false,
+                sprite: 'cat-hunting',
+                sound: 'hunting-sound'
+            },
+            {
+                text: 'Take a nap!',
+                completed: false,
+                sprite: 'cat-sleeping',
+                sound: 'sleeping-sound'
+            }
+        ];
+
+        let missionText;
+        let interactKey;
+        let fullscreenKey;
+        let objects = {};
+
+        function preload() {
+            this.load.image('background', 'bg.jpg');
+            this.load.image('cat-default', 'default.png');
+            this.load.image('cat-eating', 'eat.png');
+            this.load.image('cat-fighting', 'fight.png');
+            this.load.image('cat-dancing', 'dance.png');
+            this.load.image('cat-scratching', 'scratch.png');
+            this.load.image('cat-hunting', 'hunt.png');
+            this.load.image('cat-sleeping', 'sleep.png');
+            this.load.image('food', 'bowl.png');
+            this.load.image('vacuum', 'vacuum.png');
+            this.load.image('cardboard', 'cardboard.png');
+            this.load.image('mouse', 'mouse.png');
+            this.load.image('bed', 'bed.png');
+            this.load.audio('bgm', 'bgm.mp3');
+            this.load.audio('eating-sound', 'haheng.mp3');
+            this.load.audio('dancing-sound', 'dance.mp3');
+            this.load.audio('scratching-sound', 'laugh.mp3');
+            this.load.audio('fighting-sound', 'cry.mp3');
+            this.load.audio('hunting-sound', 'angry.mp3');
+            this.load.audio('sleeping-sound', 'eep.mp3');
+        }
+
+        function create() {
+            this.add.image(1200 / 2, 800 / 2, 'background').setDisplaySize(1200, 800).setDepth(0);
+
+            welcomeText = this.add.text(1200 / 2, 800 / 2, 'Welcome to Cupid\'s Day!\nUse WASD or touch to move\nTouch near objects to interact', {
+                fontSize: '32px',
+                fill: '#fff',
+                align: 'center',
+                backgroundColor: '#000',
+                padding: {
+                    x: 20,
+                    y: 10
+                }
+            }).setOrigin(0.5).setDepth(3);
+
+            this.tweens.add({
+                targets: welcomeText,
+                alpha: 0,
+                duration: 1000,
+                delay: 3000,
+                onComplete: () => welcomeText.destroy()
+            });
+
+            bgMusic = this.sound.add('bgm', {
+                loop: true,
+                volume: 0.3
+            });
+            bgMusic.play();
+
+            cat = this.physics.add.sprite(850, 400, 'cat-default').setScale(0.8).setDepth(2);
+            cat.setCollideWorldBounds(true);
+
+            objects.food = this.physics.add.sprite(1100, 700, 'food').setScale(0.3).setDepth(1);
+            objects.vacuum = this.physics.add.sprite(200, 650, 'vacuum').setScale(1).setDepth(1);
+            objects.cardboard = this.physics.add.sprite(550, 475, 'cardboard').setScale(0.6).setDepth(1);
+            objects.mouse = this.physics.add.sprite(1050, 100, 'mouse').setScale(0.3).setDepth(1);
+            objects.bed = this.physics.add.sprite(700, 700, 'bed').setScale(1).setDepth(1);
+
+            missionText = this.add.text(16, 16, getMissionText(), {
+                fontSize: '18px',
+                fill: '#fff',
+                backgroundColor: '#000',
+                padding: {
+                    x: 10,
+                    y: 5
+                }
+            });
+
+            this.input.keyboard.addCapture('W,A,S,D,SPACE,F');
+            interactKey = this.input.keyboard.addKey('SPACE');
+            fullscreenKey = this.input.keyboard.addKey('F');
+
+            this.input.on('pointerdown', function(pointer) {
+                if (!isInteracting) {
+                    const touchX = pointer.x;
+                    const touchY = pointer.y;
+                    const distance = Phaser.Math.Distance.Between(cat.x, cat.y, touchX, touchY);
+
+                    if (distance < 100) {
+                        checkMissionCompletion.call(this);
+                    } else {
+                        moveToPoint(touchX, touchY);
+                    }
+                }
+            }, this);
+
+            fullscreenKey.on('down', function() {
+                if (this.scale.isFullscreen) {
+                    this.scale.stopFullscreen();
+                } else {
+                    this.scale.startFullscreen();
+                }
+            }, this);
+        }
+
+
+        function moveToPoint(x, y) {
+            if (isInteracting) return;
+
+            const angle = Phaser.Math.Angle.Between(cat.x, cat.y, x, y);
+            const speed = 300;
+
+            cat.setVelocityX(Math.cos(angle) * speed);
+            cat.setVelocityY(Math.sin(angle) * speed);
+
+            if (cat.body.velocity.x < 0) {
+                cat.flipX = true;
+            } else if (cat.body.velocity.x > 0) {
+                cat.flipX = false;
+            }
+        }
+
+        function update() {
+            const cursors = this.input.keyboard.addKeys('W,A,S,D');
+            const speed = 300;
+
+            if (!isInteracting) {
+                if (cursors.A.isDown) {
+                    cat.setVelocityX(-speed);
+                    cat.flipX = true;
+                } else if (cursors.D.isDown) {
+                    cat.setVelocityX(speed);
+                    cat.flipX = false;
+                } else if (!this.input.activePointer.isDown) {
+                    cat.setVelocityX(0);
+                }
+
+                if (cursors.W.isDown) {
+                    cat.setVelocityY(-speed);
+                } else if (cursors.S.isDown) {
+                    cat.setVelocityY(speed);
+                } else if (!this.input.activePointer.isDown) {
+                    cat.setVelocityY(0);
+                }
+
+                if (cat.body.velocity.x === 0 && cat.body.velocity.y === 0) {
+                    cat.anims.stop();
+                }
+            }
+
+            if (interactKey.isDown && !isInteracting) {
+                checkMissionCompletion.call(this);
+            }
+
+            missionText.setText(getMissionText());
+        }
+
+        function checkMissionCompletion() {
+            if (missions[currentMission].completed) return;
+
+            const distance = 100;
+            let completed = false;
+
+            switch (currentMission) {
+                case 0:
+                    completed = Phaser.Math.Distance.Between(cat.x, cat.y, objects.food.x, objects.food.y) < distance;
+                    break;
+                case 1:
+                    completed = Phaser.Math.Distance.Between(cat.x, cat.y, objects.vacuum.x, objects.vacuum.y) < distance;
+                    break;
+                case 2:
+                    completed = true;
+                    break;
+                case 3:
+                    completed = Phaser.Math.Distance.Between(cat.x, cat.y, objects.cardboard.x, objects.cardboard.y) < distance;
+                    break;
+                case 4:
+                    completed = Phaser.Math.Distance.Between(cat.x, cat.y, objects.mouse.x, objects.mouse.y) < distance;
+                    break;
+                case 5:
+                    completed = Phaser.Math.Distance.Between(cat.x, cat.y, objects.bed.x, objects.bed.y) < distance;
+                    break;
+            }
+
+            if (completed) {
+                isInteracting = true;
+                cat.setVelocity(0, 0);
+
+                this.sound.play(missions[currentMission].sound);
+                cat.setTexture(missions[currentMission].sprite);
+
+                const missionDelays = [5000, 6000, 12000, 4000, 7000, 8000];
+
+                this.time.delayedCall(missionDelays[currentMission], () => {
+                    cat.setTexture('cat-default');
+                    isInteracting = false;
+
+                    missions[currentMission].completed = true;
+                    if (currentMission < missions.length - 1) {
+                        currentMission++;
+                    } else {
+                        showValentineLetter.call(this);
+                    }
+                });
+            }
+        }
+
+        function getMissionText() {
+            if (currentMission >= missions.length) {
+                return 'All missions completed! Happy Valentine\'s Day!\nPress F for fullscreen';
+            }
+            return `Mission ${currentMission + 1}: ${missions[currentMission].text}`;
+        }
+
+        function showValentineLetter() {
+            const overlay = this.add.rectangle(0, 0, 1920, 1080, 0x000000, 0)
+                .setOrigin(0, 0)
+                .setAlpha(0)
+                .setDepth(3);
+
+            this.tweens.add({
+                targets: overlay,
+                alpha: 0.7,
+                duration: 2000,
+                ease: 'Power2'
+            });
+
+            const fullText = `
+    Dear Ma. Deanne Hazel B. Tabaosares,
+
+    Congrats on completing Cupid's Day! Cupid is now eepy and
+    ready to eat after he wakes up.
+
+    How are you? Are you mad, are you eepy, are you angy? 
+    No matter which one, you're still my baby. I’m sending 
+    this letter to you to formally invite you to be my Valentine. 
+    The only choice is to accept, or else Cupid will be sad.
+
+    I want to spend my February 14th with you. We will be making 
+    memories, eating great food, sharing laughter, and maybe we 
+    can even eep together.
+
+    So, what do you say? Will you be my Valentine?
+
+    Love,
+    Irron 💖 
+    `;
+
+            const textConfig = {
+                fontSize: '24px',
+                fill: '#ff69b4',
+                backgroundColor: '#fff',
+                padding: {
+                    x: 20,
+                    y: 10
+                }
+            };
+
+            missionText.destroy();
+
+            let letterText = this.add.text(1200 / 2, 800 / 2, '', textConfig).setOrigin(0.5).setDepth(4);
+
+            let index = 0;
+            this.time.addEvent({
+                delay: 50,
+                repeat: fullText.length - 1,
+                callback: function() {
+                    letterText.text += fullText[index];
+                    index++;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
